@@ -23,7 +23,7 @@ function secureCookie(req) {
 }
 function matchesPin(input) {
   const expected = process.env.DRIMUS_PIN || '';
-  if (!/^\d{6,12}$/.test(expected) || typeof input !== 'string') return false;
+  if (!/^\d{4,12}$/.test(expected) || typeof input !== 'string') return false;
   const a = Buffer.from(input);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
