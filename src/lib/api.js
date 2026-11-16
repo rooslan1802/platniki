@@ -57,6 +57,21 @@ export async function upsert(table, row) {
   }
   await request('/api/data', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table,row}) });
 }
+export async function upsertMany(entries) {
+  for (const { table, row } of entries) {
+    if (!tables.includes(table) || !row || typeof row.id !== 'string') throw new Error('Некорректные данные для сохранения.');
+  }
+  if (localMode) {
+    const data = local();
+    for (const { table, row } of entries) {
+      const index = data[table].findIndex(item => item.id === row.id);
+      if (index >= 0) data[table][index] = row;
+      else data[table].push(row);
+    }
+    return saveLocal(data);
+  }
+  return request('/api/data', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({entries}) });
+}
 export async function remove(table, id) {
   if (!tables.includes(table)) throw new Error('Недопустимый раздел данных.');
   if (localMode) {

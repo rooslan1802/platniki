@@ -32,7 +32,18 @@ export default async function handler(req, res) {
       if (failed) return respondError(res, failed.error);
       return res.status(200).json(Object.fromEntries(tables.map((table, index) => [table, result[index].data])));
     }
-    const { table, row, id } = req.body || {};
+    const { table, row, id, entries } = req.body || {};
+    if (req.method === 'POST' && Array.isArray(entries)) {
+      if (!entries.length || entries.some(item => !tables.includes(item?.table) || !item?.row || typeof item.row.id !== 'string')) {
+        res.statusCode = 400;
+        return res.json({ error: 'Некорректные записи.' });
+      }
+      const results = await Promise.all(entries.map(({ table: target, row: value }) => supabase.from(target).upsert({ ...value, user_id: null })));
+      const failed = results.find(item => item.error);
+      if (failed) return respondError(res, failed.error);
+      res.statusCode = 200;
+      return res.json({ ok: true });
+    }
     if (!tables.includes(table)) {
       res.statusCode = 400;
       return res.json({ error: 'Недопустимый раздел данных.' });
