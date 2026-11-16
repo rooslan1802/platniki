@@ -38,9 +38,13 @@ export default async function handler(req, res) {
         res.statusCode = 400;
         return res.json({ error: 'Некорректные записи.' });
       }
-      const results = await Promise.all(entries.map(({ table: target, row: value }) => supabase.from(target).upsert({ ...value, user_id: null })));
-      const failed = results.find(item => item.error);
-      if (failed) return respondError(res, failed.error);
+      // Preserve the caller's order: a new club/student must exist before its
+      // dependent student/payment row is inserted. Parallel inserts here can
+      // race foreign-key checks and leave orphaned or missing records.
+      for (const { table: target, row: value } of entries) {
+        const { error } = await supabase.from(target).upsert({ ...value, user_id: null });
+        if (error) return respondError(res, error);
+      }
       res.statusCode = 200;
       return res.json({ ok: true });
     }

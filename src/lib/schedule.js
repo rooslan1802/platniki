@@ -1,7 +1,14 @@
 const iso = d => new Date(d).toISOString().slice(0,10);
 export function dueDate(year, monthIndex, paymentDay) { const last = new Date(year, monthIndex + 1, 0).getDate(); return iso(new Date(Date.UTC(year, monthIndex, Math.min(paymentDay, last)))); }
 export function nextDueDate(paymentDay, paidThrough) { const d = new Date(`${paidThrough}T12:00:00Z`); return dueDate(d.getUTCFullYear(), d.getUTCMonth() + 1, paymentDay); }
-export function billingDateForPayment(paymentDay, paymentDate) { const d = new Date(`${paymentDate}T12:00:00Z`); return dueDate(d.getUTCFullYear(), d.getUTCMonth(), paymentDay); }
+export function billingDateForPayment(paymentDay, paymentDate, nextPaymentDate) {
+  const paymentMonth = paymentDate.slice(0, 7);
+  // A late payment settles the oldest outstanding month. A backdated payment
+  // from before the current due month stays in its own historical month.
+  if (nextPaymentDate && paymentMonth >= nextPaymentDate.slice(0, 7)) return nextPaymentDate;
+  const d = new Date(`${paymentDate}T12:00:00Z`);
+  return dueDate(d.getUTCFullYear(), d.getUTCMonth(), paymentDay);
+}
 export function addPauseDays(nextPaymentDate, start, end) { const days = Math.max(0, Math.round((new Date(`${end}T12:00:00Z`) - new Date(`${start}T12:00:00Z`)) / 86400000)); const d = new Date(`${nextPaymentDate}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return iso(d); }
 export function localDateString(date = new Date()) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; }
 export function paymentStatus(student, today = localDateString()) { if(student.status==='paused') return 'paused'; if(student.status==='expelled') return 'expelled'; const diff=Math.round((new Date(`${student.next_payment_date}T12:00:00Z`)-new Date(`${today}T12:00:00Z`))/86400000); return diff<0?'overdue':diff===0?'today':diff<=3?'soon':'paid'; }

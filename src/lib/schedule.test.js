@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addPauseDays, dueDate, nextDueDate, paymentProgress, paymentStatus, scheduleFromPayments } from './schedule';
+import { addPauseDays, billingDateForPayment, dueDate, nextDueDate, paymentProgress, paymentStatus, scheduleFromPayments } from './schedule';
 
 describe('payment schedule', () => {
   it('keeps the fixed day after a late payment', () => {
@@ -69,5 +69,24 @@ describe('payment schedule', () => {
     ];
     expect(scheduleFromPayments(student, payments.slice(0, 1)).next_payment_date).toBe('2026-11-15');
     expect(scheduleFromPayments(student, [], '2026-11-15').next_payment_date).toBe('2026-11-15');
+  });
+
+  it('applies a late November payment to the oldest due October period', () => {
+    const student = { id: 'musa', payment_day: 11, monthly_price: 15000, next_payment_date: '2026-10-11' };
+    const september = { id: 'sep', student_id: 'musa', amount: 15000, payment_date: '2026-09-11', billing_period_end: '2026-09-11' };
+    const octoberDate = billingDateForPayment(11, '2026-11-02', student.next_payment_date);
+    expect(octoberDate).toBe('2026-10-11');
+    const october = { id: 'oct', student_id: 'musa', amount: 15000, payment_date: '2026-11-02', billing_period_end: octoberDate };
+    expect(scheduleFromPayments(student, [september, october]).next_payment_date).toBe('2026-11-11');
+  });
+
+  it('keeps an old September payment in September when October is already paid', () => {
+    const student = { id: 'ali', payment_day: 12, monthly_price: 15000, next_payment_date: '2026-11-12' };
+    expect(billingDateForPayment(12, '2026-09-09', student.next_payment_date)).toBe('2026-09-12');
+    const payments = [
+      { id: 'oct', student_id: 'ali', amount: 15000, payment_date: '2026-10-12', billing_period_end: '2026-10-12' },
+      { id: 'sep', student_id: 'ali', amount: 15000, payment_date: '2026-09-09', billing_period_end: '2026-09-12' },
+    ];
+    expect(scheduleFromPayments(student, payments).next_payment_date).toBe('2026-11-12');
   });
 });
