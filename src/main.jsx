@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useState}from'react';
 import{createRoot}from'react-dom/client';
 import{Archive,Building2,CalendarDays,CalendarClock,ChevronLeft,ChevronRight,CircleAlert,CircleCheck,Clock3,Copy,CreditCard,Database,GraduationCap,Home,MapPin,MessageCircle,MoreHorizontal,PauseCircle,Phone,Pencil,Plus,Search,Table2,UserRound,Users}from'lucide-react';
-import{loadData,remove,supabase,upsert}from'./lib/api';
+import{checkSession,loadData,login,logout as endSession,remove,upsert}from'./lib/api';
 import{addPauseDays,dueDate,nextDueDate,paymentProgress,paymentStatus,scheduleFromPayments}from'./lib/schedule';
 import'./styles.css';
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
@@ -12,12 +12,12 @@ const initials=x=>(x||'?').split(' ').map(a=>a[0]).slice(0,2).join('');
 const daysLabel=n=>`${n} ${n%100>=11&&n%100<=14?'дней':n%10===1?'день':n%10>=2&&n%10<=4?'дня':'дней'}`;
 const nextForDay=day=>{const now=new Date(),y=now.getFullYear(),m=now.getMonth(),candidate=dueDate(y,m,day);return candidate>=today()?candidate:dueDate(y,m+1,day)};
 function App(){
- const[data,setData]=useState(),[page,setPage]=useState('home'),[schoolId,setSchoolId]=useState(),[student,setStudent]=useState(),[month,setMonth]=useState(today().slice(0,7)),[session,setSession]=useState(null),[authReady,setAuthReady]=useState(!supabase),[loadError,setLoadError]=useState('');
+ const[data,setData]=useState(),[page,setPage]=useState('home'),[schoolId,setSchoolId]=useState(),[student,setStudent]=useState(),[month,setMonth]=useState(today().slice(0,7)),[session,setSession]=useState(false),[authReady,setAuthReady]=useState(false),[loadError,setLoadError]=useState('');
  const reload=async()=>{try{setData(await loadData());setLoadError('')}catch(error){setLoadError(error.message||'Не удалось загрузить данные');throw error}};
  const save=async(t,row)=>{const payload=t==='students'?(({school,club,...record})=>record)(row):row;await upsert(t,payload);await reload()};
- useEffect(()=>{navigator.serviceWorker?.register('/sw.js');if(!supabase){reload().catch(()=>{});return}let active=true;const start=async()=>{const{data:{session:current}}=await supabase.auth.getSession();if(!active)return;setSession(current);setAuthReady(true);if(current)reload().catch(()=>{})};start();const{data:{subscription}}=supabase.auth.onAuthStateChange((_event,next)=>{if(!active)return;setSession(next);setData(undefined);if(next)Promise.resolve().then(()=>reload()).catch(()=>{})});return()=>{active=false;subscription.unsubscribe()}},[]);
- if(supabase&&!authReady)return <div className="loading">Проверка входа…</div>;
- if(supabase&&!session)return <AuthPage/>;
+ useEffect(()=>{navigator.serviceWorker?.register('/sw.js');let active=true;const start=async()=>{try{const current=await checkSession();if(!active)return;setSession(current);if(current)await reload()}catch(error){if(active)setLoadError(error.message||'Не удалось проверить PIN-код')}};start().finally(()=>{if(active)setAuthReady(true)});return()=>{active=false}},[]);
+ if(!authReady)return <div className="loading">Проверка доступа…</div>;
+ if(!session)return <PinPage onLogin={async pin=>{await login(pin);setSession(true);setLoadError('');await reload()}}/>;
  if(loadError)return <div className="loading"><p>{loadError}</p><button className="save" onClick={()=>reload().catch(()=>{})}>Повторить</button></div>;
  if(!data)return <div className="loading">Загрузка…</div>;
  const students=data.students||[],payments=data.payments||[],clubs=data.clubs||[],studios=data.studios||[];
@@ -28,7 +28,7 @@ function App(){
  const openStudent=x=>{setStudent(full(x));setPage('student')};
  const openSchool=id=>{setSchoolId(id);setPage('school')};
  return <div className="app">
-  {page==='home'&&<HomePage students={active} payments={payments} month={month} setMonth={setMonth} go={setPage} logout={supabase?()=>supabase.auth.signOut():null}/>}
+  {page==='home'&&<HomePage students={active} payments={payments} month={month} setMonth={setMonth} go={setPage} logout={async()=>{await endSession();setSession(false);setData(undefined)}}/>}
   {page==='schools'&&<Schools studios={studios} students={active} payments={payments} month={month} open={openSchool} save={save}/>}
   {page==='school'&&<SchoolPage school={studios.find(x=>x.id===schoolId)} students={active.filter(x=>x.studio_id===schoolId).map(full)} payments={payments} clubs={clubs} openStudent={openStudent} back={()=>setPage('schools')} save={save}/>}
   {page==='students'&&<StudentDirectory students={active.map(full)} openStudent={openStudent}/>}
@@ -44,10 +44,10 @@ function App(){
   </nav>
  </div>
 }
-function AuthPage(){
- const[email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const submit=async e=>{e.preventDefault();setBusy(true);setError('');const{error:authError}=await supabase.auth.signInWithPassword({email:email.trim(),password});setBusy(false);if(authError)setError('Не удалось войти. Проверьте email и пароль.')};
- return <main className="auth-screen"><div className="auth-card"><span className="overline">ДРИМУС · УПРАВЛЕНИЕ ПЛАТЕЖАМИ</span><h1>Вход в приложение</h1><p>Войдите в аккаунт, чтобы открыть данные учеников.</p><form onSubmit={submit}><label>Email<input type="email" autoComplete="username" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com"/></label><label>Пароль<input type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Пароль аккаунта"/></label>{error&&<div className="auth-error" role="alert">{error}</div>}<button className="save" disabled={busy}>{busy?'Входим…':'Войти'}</button></form><small>Аккаунт создаётся заранее в Supabase → Authentication → Users.</small></div></main>
+function PinPage({onLogin}){
+ const[pin,setPin]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const submit=async e=>{e.preventDefault();setBusy(true);setError('');try{await onLogin(pin)}catch{setError('Неверный PIN-код. Попробуйте ещё раз.');setPin('')}finally{setBusy(false)}};
+ return <main className="auth-screen"><div className="auth-card pin-card"><span className="overline">ДРИМУС · УПРАВЛЕНИЕ ПЛАТЕЖАМИ</span><h1>Введите PIN-код</h1><p>Он защищает общую базу учеников и оплат.</p><form onSubmit={submit}><label>PIN-код<input type="password" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,12}" maxLength={12} required autoFocus value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,'').slice(0,12))} placeholder="Не менее 6 цифр"/></label>{error&&<div className="auth-error" role="alert">{error}</div>}<button className="save" disabled={busy}>{busy?'Проверяем…':'Открыть приложение'}</button></form><small>PIN-код выдаёт владелец приложения.</small></div></main>
 }
 function Top({title,back,right}){return <header className="top"><button onClick={back}>{back&&<ChevronLeft/>}</button><h2>{title}</h2>{right||<span/>}</header>}
 function Month({month,setMonth}){return <label className="month"><CalendarDays size={17}/><input type="month" value={month} onChange={e=>setMonth(e.target.value)}/></label>}

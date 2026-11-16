@@ -9,7 +9,7 @@ end $$;
 
 create table if not exists public.studios (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  user_id uuid default auth.uid() references auth.users(id) on delete cascade,
   name text not null,
   address text,
   contact text,
@@ -19,7 +19,7 @@ create table if not exists public.studios (
 
 create table if not exists public.clubs (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  user_id uuid default auth.uid() references auth.users(id) on delete cascade,
   name text not null,
   created_at timestamptz not null default now(),
   unique (user_id, name)
@@ -27,7 +27,7 @@ create table if not exists public.clubs (
 
 create table if not exists public.students (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  user_id uuid default auth.uid() references auth.users(id) on delete cascade,
   full_name text not null,
   parent_name text not null default '',
   parent_phone text not null default '',
@@ -49,7 +49,7 @@ create table if not exists public.students (
 
 create table if not exists public.payments (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  user_id uuid default auth.uid() references auth.users(id) on delete cascade,
   student_id uuid not null references public.students(id) on delete cascade,
   amount numeric(12, 2) not null check (amount > 0),
   payment_date date not null,
@@ -61,7 +61,7 @@ create table if not exists public.payments (
 
 create table if not exists public.payment_schedules (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  user_id uuid default auth.uid() references auth.users(id) on delete cascade,
   student_id uuid not null references public.students(id) on delete cascade,
   payment_day smallint not null check (payment_day between 1 and 31),
   monthly_price numeric(12, 2) not null,
@@ -73,7 +73,7 @@ create table if not exists public.payment_schedules (
 
 create table if not exists public.pause_history (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  user_id uuid default auth.uid() references auth.users(id) on delete cascade,
   student_id uuid not null references public.students(id) on delete cascade,
   started_at date not null,
   ended_at date,

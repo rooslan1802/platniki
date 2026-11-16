@@ -13,21 +13,23 @@ npm run dev
 
 ## Supabase
 
-Для Дримус создан отдельный проект Supabase `Drimus` (`shednvgyozvkdqqebukd`). Он не связан с базой `Dashboard`, поэтому таблицы и данные этих приложений не смешиваются. В проекте Drimus уже созданы таблицы `studios`, `clubs`, `students`, `payments`, `payment_schedules` и `pause_history`; для них включён RLS с доступом только к записям вошедшего пользователя.
+Для Дримус создан отдельный проект Supabase `Drimus` (`shednvgyozvkdqqebukd`). Он не связан с базой `Dashboard`, поэтому таблицы и данные этих приложений не смешиваются. В проекте Drimus уже созданы таблицы `studios`, `clubs`, `students`, `payments`, `payment_schedules` и `pause_history`; включён RLS, а доступ к общей базе проходит через защищённый серверный API.
 
-В локальном `.env` уже настроены адрес этого проекта и переданный публичный publishable key. Файл `.env` исключён из Git. Для входа приложения ещё нужно создать пользователя: Supabase → Authentication → Users → Add user. Придумайте email и пароль, затем используйте их на экране входа.
+Доступ к общей базе защищён общим PIN-кодом. PIN проверяет серверная функция, а данные проходят через API с HttpOnly cookie-сессией. Publishable key не используется для чтения таблиц из браузера; Supabase Secret key хранится только в серверных переменных Vercel. Таблицы закрыты RLS.
 
-Postgres URL с паролем в приложении не используется. Не добавляйте `service_role` key во фронтенд или в Vercel.
+Для деплоя задайте в Vercel → Settings → Environment Variables:
 
-Если понадобится создать такую же схему в другом чистом проекте, выполните `supabase/migrations/001_initial.sql` в SQL Editor.
+- `SUPABASE_URL` — URL проекта Drimus.
+- `SUPABASE_SECRET_KEY` — секретный `sb_secret_...` key из Supabase → Project Settings → API Keys. Это серверный ключ с полным доступом к базе: не помещайте его в `VITE_*`, Git или клиентский код.
+- `DRIMUS_PIN` — ваш общий PIN, от 6 до 12 цифр. Используйте длинный PIN и сообщайте его только администраторам.
+- `DRIMUS_SESSION_SECRET` — длинная случайная строка для подписи сессий. Например, сгенерируйте её командой `openssl rand -base64 48`.
 
-```env
-VITE_SUPABASE_URL=https://ваш-проект.supabase.co
-VITE_SUPABASE_ANON_KEY=ваш-публичный-anon-key
-```
+В Vercel добавьте переменные для Production и Preview, затем выполните новый деплой. Пользователей Supabase Auth создавать не нужно. После входа с PIN сессия действует 7 дней; кнопка «Выйти» завершает её.
+
+Если понадобится создать такую же схему в другом чистом проекте, выполните миграции `001_initial.sql` и `002_allow_installment_payments.sql`. В уже подключённом проекте Drimus для общего PIN-доступа нужно дополнительно выполнить `003_shared_pin_access.sql` в SQL Editor.
 
 ## Деплой на Vercel
 
-Импортируйте GitHub-репозиторий в Vercel. Для этого репозитория Root Directory оставьте `./`; Build Command — `npm run build`, Output Directory — `dist`. В настройках Vercel добавьте `VITE_SUPABASE_URL` со значением `https://shednvgyozvkdqqebukd.supabase.co` и `VITE_SUPABASE_ANON_KEY` со значением ранее переданного `sb_publishable_...` ключа для Production и Preview, затем выполните повторный деплой. Не добавляйте PostgreSQL URL и пароль в переменные фронтенда.
+Импортируйте GitHub-репозиторий в Vercel. Для этого репозитория Root Directory оставьте `./`; Build Command — `npm run build`, Output Directory — `dist`. Добавьте четыре серверные переменные выше и сделайте повторный деплой. Не добавляйте PostgreSQL URL или пароль базы в приложение.
 
 После публикации откройте HTTPS-ссылку в Safari на iPhone → «Поделиться» → «На экран Домой».
