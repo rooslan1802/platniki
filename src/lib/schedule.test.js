@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addPauseDays, billingDateForPayment, dueDate, nextDueDate, paymentProgress, paymentStatus, paymentsForBillingMonth, scheduleFromPayments, studentBelongsInReportMonth, studentExistedByMonth } from './schedule';
+import { addPauseDays, billingDateForPayment, dueDate, nextDueDate, paymentProgress, paymentStatus, paymentsForBillingMonth, reconcilePaymentHistory, scheduleFromPayments, studentBelongsInReportMonth, studentExistedByMonth } from './schedule';
 
 describe('payment schedule', () => {
   it('keeps the fixed day after a late payment', () => {
@@ -92,12 +92,13 @@ describe('payment schedule', () => {
 
   it('reports payments by the month they cover, even when paid late', () => {
     const payments = [
-      { id: 'late-oct', student_id: 'musa', payment_date: '2026-11-02', billing_period_end: '2026-10-11' },
-      { id: 'nov', student_id: 'musa', payment_date: '2026-11-12', billing_period_end: '2026-11-11' },
+      { id: 'late-oct', student_id: 'musa', amount: 15000, payment_date: '2026-11-02', billing_period_end: '2026-10-11' },
+      { id: 'nov', student_id: 'musa', amount: 15000, payment_date: '2026-11-12', billing_period_end: '2026-11-11' },
       { id: 'other-student', student_id: 'ali', payment_date: '2026-10-09', billing_period_end: '2026-10-11' },
     ];
-    expect(paymentsForBillingMonth(payments, 'musa', '2026-10').map(p => p.id)).toEqual(['late-oct']);
-    expect(paymentsForBillingMonth(payments, 'musa', '2026-11').map(p => p.id)).toEqual(['nov']);
+    const student={id:'musa',payment_day:11,monthly_price:15000};
+    expect(paymentsForBillingMonth(student,payments,'2026-10').map(p => p.id)).toEqual(['late-oct']);
+    expect(paymentsForBillingMonth(student,payments,'2026-11').map(p => p.id)).toEqual(['nov']);
   });
 
   it('excludes students added after the selected report month', () => {
@@ -107,9 +108,30 @@ describe('payment schedule', () => {
   });
 
   it('includes a late-created historical card when it has a payment for that month', () => {
-    const student = { id: 'old', created_at: '2026-11-12T09:00:00Z' };
-    const payments = [{ student_id: 'old', payment_date: '2026-11-02', billing_period_end: '2026-10-11' }];
+    const student = { id: 'old', payment_day: 11, monthly_price: 15000, created_at: '2026-11-12T09:00:00Z' };
+    const payments = [{ student_id: 'old', amount: 15000, payment_date: '2026-11-02', billing_period_end: '2026-10-11' }];
     expect(studentBelongsInReportMonth(student, payments, '2026-10')).toBe(true);
-    expect(studentBelongsInReportMonth({ id: 'new', created_at: '2026-11-12T09:00:00Z' }, payments, '2026-10')).toBe(false);
+    expect(studentBelongsInReportMonth({ id: 'new', payment_day: 11, monthly_price: 15000, created_at: '2026-11-12T09:00:00Z' }, payments, '2026-10')).toBe(false);
+  });
+
+  it('carries advance payments across the coming months for every student', () => {
+    const student = { id: 'nurislam', payment_day: 3, monthly_price: 15000, next_payment_date: '2026-10-03' };
+    const payments = [
+      { id: 'sep-3', student_id: 'nurislam', amount: 15000, payment_date: '2026-09-03', billing_period_end: '2026-09-03' },
+      { id: 'sep-19', student_id: 'nurislam', amount: 15000, payment_date: '2026-09-19', billing_period_end: '2026-09-03' },
+      { id: 'oct-21', student_id: 'nurislam', amount: 15000, payment_date: '2026-10-21', billing_period_end: '2026-10-03' },
+    ];
+    const reconciled = reconcilePaymentHistory(student, payments);
+    expect(reconciled.map(p => p.billing_period_end)).toEqual(['2026-09-03', '2026-10-03', '2026-11-03']);
+    expect(scheduleFromPayments(student, reconciled).next_payment_date).toBe('2026-12-03');
+    expect(paymentStatus({ ...student, ...scheduleFromPayments(student, reconciled) }, '2026-11-17')).toBe('paid');
+  });
+
+  it('splits an overpayment across consecutive monthly fees', () => {
+    const student = { id: 'ahead', payment_day: 3, monthly_price: 15000 };
+    const payments = [{ id: 'two-months', student_id: 'ahead', amount: 30000, payment_date: '2026-09-03', billing_period_end: '2026-09-03' }];
+    expect(paymentsForBillingMonth(student, payments, '2026-09')).toHaveLength(1);
+    expect(paymentsForBillingMonth(student, payments, '2026-10')).toHaveLength(1);
+    expect(scheduleFromPayments(student, payments).next_payment_date).toBe('2026-11-03');
   });
 });
