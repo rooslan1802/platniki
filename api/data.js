@@ -18,6 +18,7 @@ function respondError(res, error) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
   if (req.method !== 'GET' && rejectCrossOrigin(req, res)) return;
   if (!validSession(req)) {

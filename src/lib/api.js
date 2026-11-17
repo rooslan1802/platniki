@@ -24,7 +24,12 @@ function saveLocal(data) {
   return data;
 }
 async function request(path, options) {
-  const response = await fetch(path, { credentials: 'same-origin', ...options });
+  const response = await fetch(path, {
+    ...options,
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache', ...(options?.headers || {}) },
+  });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || 'Не удалось связаться с сервером.');
   return result;
