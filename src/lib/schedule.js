@@ -15,6 +15,7 @@ export function paymentStatus(student, today = localDateString()) { if(student.s
 export function paymentBillingMonth(payment) { const period=payment.billing_period_end||payment.billing_period_start||payment.payment_date||''; return period.slice(0,7); }
 export function paymentsForBillingMonth(payments, studentId, month) { return payments.filter(p=>p.student_id===studentId&&paymentBillingMonth(p)===month).sort((a,b)=>(a.payment_date||'').localeCompare(b.payment_date||'')); }
 export function studentExistedByMonth(student, month) { return !student.created_at || student.created_at.slice(0,7)<=month; }
+export function studentBelongsInReportMonth(student, payments, month) { return studentExistedByMonth(student,month)||payments.some(p=>p.student_id===student.id&&paymentBillingMonth(p)===month); }
 export function paymentProgress(student, payments) {
   const currentPeriod = (student.next_payment_date || '').slice(0, 7);
   const paid = payments.filter(p => p.student_id === student.id && (p.billing_period_end || p.billing_period_start || p.payment_date || '').slice(0, 7) === currentPeriod).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);

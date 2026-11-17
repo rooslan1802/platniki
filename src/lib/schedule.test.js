@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addPauseDays, billingDateForPayment, dueDate, nextDueDate, paymentProgress, paymentStatus, paymentsForBillingMonth, scheduleFromPayments, studentExistedByMonth } from './schedule';
+import { addPauseDays, billingDateForPayment, dueDate, nextDueDate, paymentProgress, paymentStatus, paymentsForBillingMonth, scheduleFromPayments, studentBelongsInReportMonth, studentExistedByMonth } from './schedule';
 
 describe('payment schedule', () => {
   it('keeps the fixed day after a late payment', () => {
@@ -104,5 +104,12 @@ describe('payment schedule', () => {
     expect(studentExistedByMonth({ created_at: '2026-11-01T10:00:00Z' }, '2026-10')).toBe(false);
     expect(studentExistedByMonth({ created_at: '2026-10-31T22:00:00Z' }, '2026-10')).toBe(true);
     expect(studentExistedByMonth({}, '2026-10')).toBe(true);
+  });
+
+  it('includes a late-created historical card when it has a payment for that month', () => {
+    const student = { id: 'old', created_at: '2026-11-12T09:00:00Z' };
+    const payments = [{ student_id: 'old', payment_date: '2026-11-02', billing_period_end: '2026-10-11' }];
+    expect(studentBelongsInReportMonth(student, payments, '2026-10')).toBe(true);
+    expect(studentBelongsInReportMonth({ id: 'new', created_at: '2026-11-12T09:00:00Z' }, payments, '2026-10')).toBe(false);
   });
 });
