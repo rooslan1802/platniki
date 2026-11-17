@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addPauseDays, billingDateForPayment, dueDate, nextDueDate, paymentProgress, paymentStatus, scheduleFromPayments } from './schedule';
+import { addPauseDays, billingDateForPayment, dueDate, nextDueDate, paymentProgress, paymentStatus, paymentsForBillingMonth, scheduleFromPayments, studentExistedByMonth } from './schedule';
 
 describe('payment schedule', () => {
   it('keeps the fixed day after a late payment', () => {
@@ -88,5 +88,21 @@ describe('payment schedule', () => {
       { id: 'sep', student_id: 'ali', amount: 15000, payment_date: '2026-09-09', billing_period_end: '2026-09-12' },
     ];
     expect(scheduleFromPayments(student, payments).next_payment_date).toBe('2026-11-12');
+  });
+
+  it('reports payments by the month they cover, even when paid late', () => {
+    const payments = [
+      { id: 'late-oct', student_id: 'musa', payment_date: '2026-11-02', billing_period_end: '2026-10-11' },
+      { id: 'nov', student_id: 'musa', payment_date: '2026-11-12', billing_period_end: '2026-11-11' },
+      { id: 'other-student', student_id: 'ali', payment_date: '2026-10-09', billing_period_end: '2026-10-11' },
+    ];
+    expect(paymentsForBillingMonth(payments, 'musa', '2026-10').map(p => p.id)).toEqual(['late-oct']);
+    expect(paymentsForBillingMonth(payments, 'musa', '2026-11').map(p => p.id)).toEqual(['nov']);
+  });
+
+  it('excludes students added after the selected report month', () => {
+    expect(studentExistedByMonth({ created_at: '2026-11-01T10:00:00Z' }, '2026-10')).toBe(false);
+    expect(studentExistedByMonth({ created_at: '2026-10-31T22:00:00Z' }, '2026-10')).toBe(true);
+    expect(studentExistedByMonth({}, '2026-10')).toBe(true);
   });
 });
