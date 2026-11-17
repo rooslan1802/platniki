@@ -149,3 +149,10 @@
 .submit-label{display:inline-flex;align-items:center;justify-content:center;gap:9px}
 .spinner{width:16px;height:16px;border:2px solid #ffffff69;border-top-color:#fff;border-radius:50%;animation:drimus-spin .7s linear infinite}
 @keyframes drimus-spin{to{transform:rotate(360deg)}}
+.modal form>.top{grid-template-columns:40px minmax(0,1fr) 40px;margin:0 0 12px;height:48px}
+.modal form>.top h2{font-size:18px}
+.modal-close{width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:#322548;color:#e8d9ff}
+.thead,.trow{grid-template-columns:minmax(125px,1.3fr) minmax(115px,1.15fr) minmax(105px,1fr) minmax(90px,.9fr) minmax(150px,1.35fr);min-width:700px}
+.thead{align-items:start;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
+.thead span,.trow span,.trow strong{min-width:0;overflow-wrap:anywhere;white-space:normal}
+.report-table{overscroll-behavior-x:contain}
